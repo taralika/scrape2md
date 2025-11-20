@@ -2,7 +2,9 @@
 
 import pytest
 from scrape2md import WebScraper
+from scrape2md.scraper import MAX_FILENAME_LENGTH
 
+LONG_TITLE_LENGTH = 200
 
 def test_normalize_url():
     """Test URL normalization."""
@@ -29,8 +31,8 @@ def test_sanitize_filename():
     assert scraper.sanitize_filename("Too   Many   Spaces") == "Too Many Spaces"
     
     # Length limiting
-    long_title = "A" * 200
-    assert len(scraper.sanitize_filename(long_title)) <= 100
+    long_title = "A" * LONG_TITLE_LENGTH
+    assert len(scraper.sanitize_filename(long_title)) <= MAX_FILENAME_LENGTH
 
 
 def test_is_same_domain():

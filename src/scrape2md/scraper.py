@@ -17,12 +17,33 @@ from bs4 import BeautifulSoup
 import html2text
 import requests
 
+MIN_PAGE_TEXT_LENGTH = 200
+MIN_IMPORTANT_PAGE_TEXT_LENGTH = 50
+MIN_TITLE_LENGTH = 3
+MIN_NAV_LINKS_THRESHOLD = 3
+MIN_GALLERY_HEADING_LENGTH = 5
+MIN_CONTENT_HEADING_LENGTH = 3
+MIN_IFRAME_TEXT_LENGTH = 200
+MAX_CONTENT_HEADING_LENGTH = 100
+MAX_FILENAME_LENGTH = 100
+MAX_ELEMENT_TEXT_LENGTH = 200
+LOW_PRIORITY_THRESHOLD = 0.8
+MAX_QUERY_DISPLAY_LENGTH = 40
+MAX_IMAGES_TO_DOWNLOAD = 50
+DEFAULT_MAX_PAGES = 100
+DELAY = 1.0
+PAGE_LOAD_TIMEOUT = 10000
+MAIN_RESOURCE_TIMEOUT = 30000
+REQUEST_TIMEOUT = 30
+CHUNK_SIZE = 8192
+MARKDOWN_HEADER_SPLIT = 2
+MARKDOWN_HEADER_LINES = 2
 
 class WebScraper:
     """Scrapes websites and converts them to markdown format."""
     
-    def __init__(self, base_url: str, output_dir: str, max_pages: int = 100, 
-                 delay: float = 1.0, download_images: bool = False):
+    def __init__(self, base_url: str, output_dir: str, max_pages: int = DEFAULT_MAX_PAGES, 
+                 delay: float = DELAY, download_images: bool = False):
         """
         Initialize the web scraper.
         
@@ -105,7 +126,7 @@ class WebScraper:
                     href = link['href']
                     title = link.get_text(strip=True)
                     
-                    if not title or len(title) < 3:
+                    if not title or len(title) < MIN_TITLE_LENGTH:
                         continue
                     
                     if title.lower() in ['menu', 'log on', 'login', 'sign in', 'sign up', 'register']:
@@ -125,7 +146,7 @@ class WebScraper:
                             print(f"  Mapped: {title} -> ...Menu_Item_ID={menu_id}")
                         else:
                             self.url_title_map[parsed.query] = title
-                            print(f"  Mapped: {title} -> ...{parsed.query[:40]}")
+                            print(f"  Mapped: {title} -> ...{parsed.query[:MAX_QUERY_DISPLAY_LENGTH]}")
     
     def is_low_priority_url(self, url: str) -> bool:
         """Check if URL is low priority (help pages, etc.)"""
@@ -164,11 +185,11 @@ class WebScraper:
         # Don't filter out important pages
         important_patterns = ['/faq', '/resources/', '/about', '/guide', '/help']
         if any(pattern in url.lower() for pattern in important_patterns):
-            if len(text) < 50:
+            if len(text) < MIN_IMPORTANT_PAGE_TEXT_LENGTH:
                 return True
             return False
         
-        if len(text) < 200:
+        if len(text) < MIN_PAGE_TEXT_LENGTH:
             return True
         
         return False
@@ -203,7 +224,7 @@ class WebScraper:
                         headings = soup.find_all(tag)
                         for heading in headings:
                             text = heading.get_text(strip=True)
-                            if text and len(text) > 5 and '(' in text and ')' in text:
+                            if text and len(text) > MIN_GALLERY_HEADING_LENGTH and '(' in text and ')' in text:
                                 return f"{title} - {text}"
                 
                 return title
@@ -216,7 +237,7 @@ class WebScraper:
                 skip_patterns = ['menu', 'log on', 'format this site', 'slide show settings',
                                 'useful links', 'sign up', 'upcoming events', 'recent events',
                                 'welcome to', 'copyright']
-                if text and len(text) > 3 and len(text) < 100:
+                if text and len(text) > MIN_CONTENT_HEADING_LENGTH and len(text) < MAX_CONTENT_HEADING_LENGTH:
                     if not any(skip in text.lower() for skip in skip_patterns):
                         return text
         
@@ -225,7 +246,7 @@ class WebScraper:
         if title_tag and title_tag.string:
             title = title_tag.string.strip()
             title = re.sub(r'\s*[-|]\s*.*$', '', title)
-            if title and len(title) > 3:
+            if title and len(title) > MIN_TITLE_LENGTH:
                 return title
         
         return None
@@ -234,7 +255,7 @@ class WebScraper:
         """Convert title to safe filename."""
         safe = re.sub(r'[^\w\s\-.]', '', title)
         safe = re.sub(r'\s+', ' ', safe)
-        safe = safe.strip()[:100]
+        safe = safe.strip()[:MAX_FILENAME_LENGTH]
         return safe
     
     def is_same_domain(self, url: str) -> bool:
@@ -265,7 +286,7 @@ class WebScraper:
         images = []
         
         try:
-            page.wait_for_load_state('networkidle', timeout=10000)
+            page.wait_for_load_state('networkidle', timeout=PAGE_LOAD_TIMEOUT)
         except PlaywrightTimeout:
             print(f"  Warning: Page load timeout, proceeding anyway...")
         
@@ -330,7 +351,7 @@ class WebScraper:
             combined_iframe_content = '\n'.join(content_parts)
             iframe_soup = BeautifulSoup(combined_iframe_content, 'html.parser')
             iframe_text = iframe_soup.get_text(strip=True)
-            if len(iframe_text) > 200:
+            if len(iframe_text) > MIN_IFRAME_TEXT_LENGTH:
                 final_html = combined_iframe_content
             else:
                 print(f"  Note: Iframe content too short ({len(iframe_text)} chars), using main page")
@@ -362,13 +383,13 @@ class WebScraper:
         for elem in soup.find_all(['div', 'form', 'table', 'ul', 'li', 'p']):
             elem_text = elem.get_text().lower().strip()
             if any(pattern in elem_text for pattern in boilerplate_text_patterns):
-                if len(elem_text) < 200:
+                if len(elem_text) < MAX_ELEMENT_TEXT_LENGTH:
                     elem.decompose()
         
         # Remove navigation menus
         for table in soup.find_all('table'):
             links = table.find_all('a', href=lambda x: x and 'javascript' in str(x).lower())
-            if len(links) > 3:
+            if len(links) > MIN_NAV_LINKS_THRESHOLD:
                 table.decompose()
         
         # Remove login/auth forms
@@ -460,11 +481,11 @@ class WebScraper:
             
             filepath = resources_dir / filename
             
-            response = requests.get(url, timeout=30, stream=True)
+            response = requests.get(url, timeout=REQUEST_TIMEOUT, stream=True)
             response.raise_for_status()
             
             with open(filepath, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
+                for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
                     f.write(chunk)
             
             self.downloaded_files[url] = str(filepath)
@@ -490,7 +511,7 @@ class WebScraper:
         print(f"\n[{len(self.visited_urls)}/{self.max_pages}] Scraping: {url}{priority_marker}")
         
         try:
-            page.goto(url, wait_until='domcontentloaded', timeout=30000)
+            page.goto(url, wait_until='domcontentloaded', timeout=MAIN_RESOURCE_TIMEOUT)
             
             google_embeds = self.detect_google_embeds(page)
             if google_embeds:
@@ -540,15 +561,15 @@ class WebScraper:
                         else:
                             embed_notes.append(f"- [View Google Document]({embed_url})")
                     
-                    lines = markdown.split('\n', 2)
-                    if len(lines) >= 2:
+                    lines = markdown.split('\n', MARKDOWN_HEADER_SPLIT)
+                    if len(lines) >= MARKDOWN_HEADER_SPLIT:
                         embed_note = "\n**Note:** This page contains embedded Google documents:\n" + '\n'.join(embed_notes) + "\n"
                         markdown = lines[0] + '\n' + embed_note + '\n' + '\n'.join(lines[1:])
             
             # Check for duplicate content
             markdown_lines = markdown.split('\n')
             if markdown_lines and markdown_lines[0].startswith('# Source:'):
-                content_for_hash = '\n'.join(markdown_lines[2:])
+                content_for_hash = '\n'.join(markdown_lines[MARKDOWN_HEADER_LINES:])
             else:
                 content_for_hash = markdown
             
@@ -599,7 +620,7 @@ class WebScraper:
             # Download images if enabled
             if self.download_images and images and not is_low_priority:
                 print(f"  Downloading {len(images)} images...")
-                for img_url in images[:50]:
+                for img_url in images[:MAX_IMAGES_TO_DOWNLOAD]:
                     try:
                         self.download_embedded_resource(img_url)
                     except Exception as e:
@@ -647,7 +668,7 @@ class WebScraper:
             while len(self.visited_urls) < self.max_pages:
                 if high_priority_urls:
                     url = high_priority_urls.pop(0)
-                elif low_priority_urls and len(self.visited_urls) < self.max_pages * 0.8:
+                elif low_priority_urls and len(self.visited_urls) < self.max_pages * LOW_PRIORITY_THRESHOLD:
                     url = low_priority_urls.pop(0)
                 elif low_priority_urls:
                     print(f"\nSkipping {len(low_priority_urls)} low-priority URLs to focus on main content")
