@@ -1,6 +1,7 @@
 # scrape2md 🕷️ → 📝
 
 [![PyPI version](https://badge.fury.io/py/scrape2md.svg)](https://pypi.org/project/scrape2md/)
+[![CodeQL](https://github.com/taralika/scrape2md/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/taralika/scrape2md/actions/workflows/github-code-scanning/codeql)
 [![Python versions](https://img.shields.io/pypi/pyversions/scrape2md.svg)](https://pypi.org/project/scrape2md/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Downloads](https://static.pepy.tech/badge/scrape2md)](https://pepy.tech/project/scrape2md)
