@@ -17,27 +17,82 @@ from bs4 import BeautifulSoup
 import html2text
 import requests
 
-MIN_PAGE_TEXT_LENGTH = 200
-MIN_IMPORTANT_PAGE_TEXT_LENGTH = 50
-MIN_TITLE_LENGTH = 3
-MIN_NAV_LINKS_THRESHOLD = 3
-MIN_GALLERY_HEADING_LENGTH = 5
-MIN_CONTENT_HEADING_LENGTH = 3
-MIN_IFRAME_TEXT_LENGTH = 200
-MAX_CONTENT_HEADING_LENGTH = 100
-MAX_FILENAME_LENGTH = 100
-MAX_ELEMENT_TEXT_LENGTH = 200
-LOW_PRIORITY_THRESHOLD = 0.8
-MAX_QUERY_DISPLAY_LENGTH = 40
-MAX_IMAGES_TO_DOWNLOAD = 50
-DEFAULT_MAX_PAGES = 100
-DELAY = 1.0
-PAGE_LOAD_TIMEOUT = 10000
-MAIN_RESOURCE_TIMEOUT = 30000
-REQUEST_TIMEOUT = 30
-CHUNK_SIZE = 8192
-MARKDOWN_HEADER_SPLIT = 2
-MARKDOWN_HEADER_LINES = 2
+# ==============================================================================
+# CONFIGURATION CONSTANTS
+# ==============================================================================
+# These constants control the behavior of the web scraper. Values were chosen
+# through testing and empirical observation of typical website structures.
+# Adjust carefully as changes may affect content quality and performance.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Content Quality Thresholds
+# ------------------------------------------------------------------------------
+# Minimum text lengths to determine if content is substantial enough to save
+
+MIN_PAGE_TEXT_LENGTH = 200  # General pages: filters out near-empty pages
+MIN_IMPORTANT_PAGE_TEXT_LENGTH = 50  # FAQ/resources: more lenient threshold
+MIN_IFRAME_TEXT_LENGTH = 200  # Embedded content: ensures meaningful iframes
+MAX_ELEMENT_TEXT_LENGTH = 200  # Boilerplate detection: removes short repeated elements
+
+# ------------------------------------------------------------------------------
+# Title and Heading Validation
+# ------------------------------------------------------------------------------
+# Character count limits for identifying valid titles and headings
+
+MIN_TITLE_LENGTH = 3  # Minimum characters for valid page/link title
+MIN_GALLERY_HEADING_LENGTH = 5  # Gallery headings with "(x)" pattern
+MIN_CONTENT_HEADING_LENGTH = 3  # Valid content headings (not navigation)
+MAX_CONTENT_HEADING_LENGTH = 100  # Prevents overly long text from being titles
+
+# ------------------------------------------------------------------------------
+# Navigation Detection
+# ------------------------------------------------------------------------------
+# Thresholds for identifying navigation menus vs. content
+
+MIN_NAV_LINKS_THRESHOLD = 3  # Tables with >3 JavaScript links are likely nav menus
+
+# ------------------------------------------------------------------------------
+# Filename and Display Limits
+# ------------------------------------------------------------------------------
+# String truncation limits for filesystem safety and display formatting
+
+MAX_FILENAME_LENGTH = 100  # Prevents filesystem path length issues
+MAX_QUERY_DISPLAY_LENGTH = 40  # Truncates query strings in console output
+
+# ------------------------------------------------------------------------------
+# Crawling and Download Limits
+# ------------------------------------------------------------------------------
+# Caps to prevent excessive resource usage
+
+DEFAULT_MAX_PAGES = 100  # Default maximum pages to crawl per site
+MAX_IMAGES_TO_DOWNLOAD = 50  # Maximum images per page (prevents abuse)
+LOW_PRIORITY_THRESHOLD = 0.8  # Process low-priority URLs only after 80% done
+
+# ------------------------------------------------------------------------------
+# Network Timeouts (milliseconds for Playwright, seconds for requests)
+# ------------------------------------------------------------------------------
+# Timeout values balance thoroughness with responsiveness
+
+PAGE_LOAD_TIMEOUT = 10000  # 10s: Wait for network idle state
+MAIN_RESOURCE_TIMEOUT = 30000  # 30s: Wait for DOM content loaded
+REQUEST_TIMEOUT = 30  # 30s: HTTP requests timeout (requests library)
+
+# ------------------------------------------------------------------------------
+# Rate Limiting and Performance
+# ------------------------------------------------------------------------------
+# Values to be respectful of target servers and optimize performance
+
+DELAY = 1.0  # Seconds between requests (be polite to servers)
+CHUNK_SIZE = 8192  # 8KB: Streaming download chunk size
+
+# ------------------------------------------------------------------------------
+# Markdown Processing
+# ------------------------------------------------------------------------------
+# Constants for manipulating generated markdown structure
+
+MARKDOWN_HEADER_SPLIT = 2  # Split markdown at line 2 to insert embed notes
+MARKDOWN_HEADER_LINES = 2  # Skip first 2 lines (title + source) for content hash
 
 class WebScraper:
     """Scrapes websites and converts them to markdown format."""
