@@ -20,6 +20,7 @@ import requests
 MIN_PAGE_TEXT_LENGTH = 200
 MIN_IMPORTANT_PAGE_TEXT_LENGTH = 50
 MIN_TITLE_LENGTH = 3
+MIN_NAV_LINKS_THRESHOLD = 3
 MIN_GALLERY_HEADING_LENGTH = 5
 MIN_CONTENT_HEADING_LENGTH = 3
 MIN_IFRAME_TEXT_LENGTH = 200
@@ -27,7 +28,7 @@ MAX_CONTENT_HEADING_LENGTH = 100
 MAX_FILENAME_LENGTH = 100
 MAX_ELEMENT_TEXT_LENGTH = 200
 LOW_PRIORITY_THRESHOLD = 0.8
-QUERY_SLICE_LIMIT = 40
+MAX_QUERY_DISPLAY_LENGTH = 40
 MAX_IMAGES_TO_DOWNLOAD = 50
 DEFAULT_MAX_PAGES = 100
 DELAY = 1.0
@@ -145,7 +146,7 @@ class WebScraper:
                             print(f"  Mapped: {title} -> ...Menu_Item_ID={menu_id}")
                         else:
                             self.url_title_map[parsed.query] = title
-                            print(f"  Mapped: {title} -> ...{parsed.query[:QUERY_SLICE_LIMIT]}")
+                            print(f"  Mapped: {title} -> ...{parsed.query[:MAX_QUERY_DISPLAY_LENGTH]}")
     
     def is_low_priority_url(self, url: str) -> bool:
         """Check if URL is low priority (help pages, etc.)"""
@@ -388,7 +389,7 @@ class WebScraper:
         # Remove navigation menus
         for table in soup.find_all('table'):
             links = table.find_all('a', href=lambda x: x and 'javascript' in str(x).lower())
-            if len(links) > MIN_TITLE_LENGTH:
+            if len(links) > MIN_NAV_LINKS_THRESHOLD:
                 table.decompose()
         
         # Remove login/auth forms
